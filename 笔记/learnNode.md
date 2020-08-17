@@ -290,3 +290,225 @@ server.listen(8080, () => {
 });
 ```
 
+## express的使用
+
+### express的基本使用
+
+```js
+const express = require("express");
+
+const app = express();
+
+app.get("/", (request, response) => {
+  response.send("hello coderdxh");
+});
+
+app.listen(8080, () => {
+  console.log("success...");
+});
+```
+
+### express 搭建静态资源服务器
+
+```js
+// 创建静态资源服务器 --- express
+// 为了提供诸如图像、CSS 文件和 JavaScript 文件之类的静态文件，请使用 Express 中的 express.static 内置中间件函数。
+const express = require("express");
+
+// 创建服务器
+const app = express();
+
+// 例如，通过如下代码就可以将 web 目录下的图片、CSS 文件、JavaScript 文件对外开放访问了：
+app.use(express.static("web"))
+
+// 开启服务器
+app.listen(8080, () => {
+  console.log("success...");
+});
+```
+
+### 实现一个简单的get接口
+
+```js
+/**
+ * 接口：得到一条随机笑话
+ * 接口地址： /joke
+ * 请求方式：get
+ * 参数：无
+ * 返回：一条笑话
+ */
+
+const express = require("express");
+
+const app = express();
+
+app.get("/joke", (request, response) => {
+  // 准备n条数据，实际开发的时候笑话肯定是从数据库或者其他数据源获取到的
+  let jokeArr = ["狐狸容易摔跤，因为它特别脚滑", "波波是男的", "想不出来了"];
+  let index = Math.floor(Math.random() * 3); // 0 1 2
+  // 返回笑话
+  response.send(jokeArr[index]);
+})
+
+app.listen(8080,() => {
+  console.log("success...");
+});
+```
+
+### 实现一个返回json数据的接口
+
+```js
+/**
+ * 接口：返回一个食物
+ * 接口地址： /food
+ * 请求方式：get
+ * 请求参数：无
+ * 返回值：json
+ */
+
+const express = require("express");
+
+const app = express();
+
+app.get("/food", (request, response) => {
+  response.send({
+    foodName: "红烧肉",
+    price: 30,
+    description: "油而不腻，美味"
+  });
+})
+
+app.listen(8080,() => {
+  console.log("success...");
+});
+```
+
+### 实现一个get带有参数的接口
+
+```js
+/**
+ * 接口: 查询英雄外号
+ *       根据英雄名返回英雄外号
+ * 接口地址： /getNickName
+ * 请求方式： get
+ * 请求参数：heroName
+ *          英雄名(提莫/盖伦/李青...)
+ * 返回值：英雄外号
+ */
+
+const express = require("express");
+
+const app = express();
+
+app.get("/getNickName", (request, response) => {
+  console.log(request.query);  // { heroName: '提莫' }
+
+  let heroNickName = "";
+
+  switch (request.query.heroName) {
+    case "提莫":
+      heroNickName = "迅捷斥候";
+      break;
+    case "亚索":
+      heroNickName = "疾风剑豪";
+      break;
+    case "盖伦":
+      heroNickName = "德玛西亚之力";
+      break;
+    case "火男":
+      heroNickName = "复仇焰魂";
+      break;
+    default:
+      heroNickName = "该英雄不存在";
+      break;
+  }
+  response.send(heroNickName);
+})
+
+app.listen(8080, () => {
+  console.log("success...");
+});
+```
+
+### 实现一个post带有参数的接口
+
+```js
+/**
+ * 接口：用户登录
+ * 请求地址：/login
+ * 请求方式：post
+ * 请求参数：username  password
+ *          用户名     密码
+ * 返回值：登录成功/登录失败
+ */
+
+const express = require("express");
+const bodyParser = require("body-parser");
+
+const app = express();
+
+// parse application/x-www-form-urlencoded  使用body-parser中间件
+app.use(bodyParser.urlencoded({ extended: false }))
+
+app.post("/login", (request, response) => {
+  // 接收用户传递过来的用户名和密码
+
+  // 由于是post方式传递过来的参数，所以用request.query这种方式拿不到
+  // 想要获取到通过post传递过来的参数，我们就要使用第三方模块 ： body-parser
+  console.log(request.body); // { username: 'admin', password: '123456' }
+
+  if (request.body.username === "admin" && request.body.password === "888888") {
+    response.send({
+      code: "200",
+      msg: "登录成功"
+    });
+  } else {
+    response.send({
+      code: "400",
+      msg: "账号密码不正确"
+    });
+  }
+})
+
+app.listen(8080, () => {
+  console.log("success...");
+});
+```
+
+### 实现一个post带有参数传文件的接口
+
+```js
+/**
+ * 注册接口
+ * 接口地址：/register
+ * 请求方式：post
+ * 请求参数：username password usericon(用户头像，图片文件)
+ * 返回数据：注册成功/注册失败
+ */
+
+const express = require("express");
+const multer = require("multer");
+
+// 创建一个uploads这个文件夹
+const upload = multer({ dest: 'uploads/' })
+
+const app = new express();
+
+app.post('/register', upload.single('usericon'), function (req, res) {
+  // req.file is the `usericon` file // 传过来的文件，参数名用usericon
+  // req.body will hold the text fields, if there were any  // 一起传过来的文件保存在req.body中
+
+  console.log(req.file);  // 记录了传递过来的文件的一些信息
+  console.log(req.body);  // { username: 'coderdxh', password: '123456' }
+
+  res.send("sb");
+})
+
+
+app.listen(8080, () => {
+  console.log("success...");
+});
+```
+
+
+
