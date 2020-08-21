@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+
+<body>
+  <script>
+    const foo = () => {
+      console.log("foo执行了")
+    }
+    const fn = (backData) => {
+      console.log("我是事先准备好的fn函数");
+      console.log(backData);
+    }
+  </script>
+
+  <!-- 把事先准备好的函数名传递给后端接口 -->
+  <script src="http://127.0.0.1:8080/all?callback=fn"></script>
+  
+</body>
+
+</html>

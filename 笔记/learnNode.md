@@ -510,5 +510,165 @@ app.listen(8080, () => {
 });
 ```
 
+## Learn middleware
 
+*中间件*功能是可以访问请求对象（`req`），响应对象（`res`）以及`next`应用程序的请求-响应周期中的功能的功能。该`next`功能是Express路由器中的功能，当调用该功能时，将在当前中间件之后执行中间件。
+
+中间件功能可以执行以下任务：
+
+- 执行任何代码。
+- 更改请求和响应对象。
+- 结束请求-响应周期。
+- 调用堆栈中的下一个中间件。
+
+如果当前中间件功能没有结束请求-响应周期，则必须调用`next()`将控制权传递给下一个中间件功能。否则，该请求将被挂起。
+
+下图显示了中间件函数调用的元素：
+
+![express-middleware](./express_middleware.png)
+
+### 简单使用
+
+```js
+const express = require("express");
+
+const app = express();
+
+// 就是服务器开启之后和路由响应之前，执行的一个函数
+// 这个函数是可以操作req, res 的
+// next()函数就是让你去执行下一个中间件的
+
+// 中间件
+app.use((req, res, next) => {
+  req.requestTime = Date.now();
+  res.name = "coderdxh";
+  console.log('LOGGED')
+  next()
+})
+
+app.get("/", (req, res) => {
+  console.log(req.requestTime);  // 1597849701585
+  res.send(res.name);
+});
+
+app.listen(8080, () => {
+  console.log("success...");
+});
+```
+
+## 跨域
+
+### 跨域介绍
+
+#### 1. 跨域固定报错格式
+
+   **只要是出现跨域问题，浏览器就会出现一个固定格式(没有之一)的报错信息**
+
+   > Access to XMLHttpRequest at '服务器url地址' from origin 'http://127.0.0.1:5501' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+
+   ![跨域错误问题](./跨域错误问题.png)
+
+#### 2.  什么是跨域
+
+   浏览器使用`ajax`时，如果请求了的`接口地址`和当前`打开的页面`地址`不同源`称之为跨域。
+
+   + ajax：浏览器只有使用ajax发送请求才会出现跨域。href属性和src属性不会出现跨域。
+   + 接口地址：ajax请求的url
+   + 打开的页面：当前页面的window.location.href
+   + 不同源：浏览器使用ajax，向不同源的接口发送请求，称之为 **跨域访问**。
+
+#### 3. 什么是同源？
+   + MDN：https://developer.mozilla.org/zh-CN/docs/Web/Security/Same-origin_policy
+   + 同源定义：两个url地址的`协议`和`主机`和`端口`均一致
+     + 协议：http,https,file
+     + 主机：域名或者ip地址
+     + 端口：8080等等
+   + 不同源定义：两个url地址，`协议` `主机` `端口`三者中只要有一个不一致
+
+4. 跨域解决方案介绍
+   + 跨域是前端工作中不可避免的问题：我们经常会出现请求不同源接口的情况，为了能获取数据，解决跨域的问题方案也有很多，但是常用的就两种
+   + 第一种：`CORS`
+     + 目前的主流方案，也是最简单的方案，直接让后端设置响应头，允许资源共享就ok.
+   + 第二种：`JSONP`
+     + 曾经的跨域杀手，专治各种跨域问题。现在慢慢的淡出历史舞台
+     + PS：面试官特别喜欢问这个，因为这个有一定的技术难度，也能体现一个人的实际开发经验
+     + jsonp是前后端配合来使用的
+     + 使用原理：通过动态创建script标签，通过script标签的src属性请求没有跨域权限来获取资源
+
+#### 4.在中间件里设置允许资源共享cors来解决跨域限制
+
+```js
+app.use((req, res, next) => {
+  // 在这里设置响应头，允许资源共享
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  next();
+});
+```
+
+```js
+// 使用cors模块 需要先npm i cors
+const cors = require("cors");
+const express = require("express");
+
+const app = express();
+
+// 这句话和我们自己上边写的那个中间件设置资源共享的效果相同。
+app.use(cors());
+```
+
+#### 5.jsonp的简单使用
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+
+<body>
+  <script>
+    const foo = () => {
+      console.log("foo执行了")
+    }
+    const fn = (backData) => {
+      console.log("我是事先准备好的fn函数");
+      console.log(backData);
+    }
+  </script>
+
+  <!-- 把事先准备好的函数名传递给后端接口 -->
+  <script src="http://127.0.0.1:8080/all?callback=fn"></script>
+  
+</body>
+
+</html>
+```
+
+```js
+const express = require("express");
+
+const app = express();
+
+app.get("/all", (req, res) => {
+  // res.send(`foo();`);
+  // 现在有一个问题，就是返回的这个函数调用，我怎么知道应该返回什么样的函数名呢？
+  // 或者说我这里怎么知道访问我这个接口的前端页面有什么样的写好的函数呢？
+  // 所以写死 foo() 不合理
+  // 解决办法是：前端把已经准备好的函数名用参数的形式带过来
+
+  // console.log(req.query); // { callback: 'fn' }
+  // res.send(`${req.query.callback}();`);
+
+  // 我还想传递数据给前端
+  const data = { "username": "coderdxh", "password": "123456" };
+  res.send(`${req.query.callback}(${JSON.stringify(data)});`);
+});
+
+app.listen(8080, () => {
+  console.log("success...");
+});
+```
 
