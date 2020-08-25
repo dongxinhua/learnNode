@@ -672,3 +672,238 @@ app.listen(8080, () => {
 });
 ```
 
+## sql语句
+
+### 增删改查语句
+
+####  增删改查的意思
+
++ 增：新增记录 insert
++ 删：删除记录 delete
++ 查：查询记录 select
++ 改：修改记录 update 
+
+#### insert语句
+
+> insert 语句对应的是"增"，也即是新增数据。
+
+**基本用法**
+
+```sql
+insert into 表名(字段名) values(值);
+```
+
+**举例**
+
+```sql
+insert into student(name,age) values("andy", 20);
+```
+
+这表示给 student 表新增一条数据，name的值为 andy，age 的值为 20。
+
+#### delete语句
+
+> delete 语句对应的是"删"，也即是删除数据。
+
+**基本用法**
+
+```sql
+delete from 表名 where 条件
+```
+
+**举例**
+
+```sql
+delete from student where name = "coderdxh";
+```
+
+这表示删除 student 表 name 为 "coderdxh" 的 那条数据。
+
+#### update语句
+
+> update 语句对应的是"改"，也即是修改数据。
+
+**基本用法**
+
+```sql
+update 表名 set 字段名 = 新值 where 条件;
+update 表名 set 字段名1 = 新值1, 字段名2 = 新值2 where 条件
+```
+
+**举例**
+
+```sql
+update student set name = "coderdxh" where name = "dxh";
+```
+
+这表示 修改 student 表 name 为 "dxh" 的那条数据的 name 为 "coderdxh"
+
+#### select语句
+
+> select 语句对应的是"查"，也即是查询数据。
+
+**基本用法**
+
+```sql
+select * from 表名;
+select 字段名1,字段名2 from 表名
+select 字段名1,字段名2 from 表名 where 条件;
+```
+
+**举例**
+
+```sql
+select name,age from student where age > 18;
+```
+
+这表示查询 student 表 中 age 大于18的name,age字段的数据。
+
+## nodejs中操作mysql
+
+想要在nodejs中操作mysql数据库，首先要安装mysql模块，`npm i mysql` 。
+
+由于最新的mysql模块并未完全支持MySQL 8的**caching_sha2_password**加密方式，而**caching_sha2_password**在MySQL 8中是默认的加密方式。
+
+因此，使用nodejs的mysql模块运行代码会报错：`ER_NOT_SUPPORTED_AUTH_MODE`
+
+**解决办法：**
+
+解决方法是重新修改用户root的密码，并指定mysql模块能够支持的加密方式：
+
+```
+mysql> ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '123456';
+Query OK, 0 rows affected (0.12 sec)
+```
+
+上述语句，显示指定了使用“mysql_native_password”的加密方式。这种方式是在mysql模块能够支持。
+
+### nodejs操作数据库---查
+
+```js
+const mysql  = require('mysql');
+
+// 创建一个和数据库的连接
+const connection = mysql.createConnection({
+  host : 'localhost', // 数据库服务器的地址
+  user : 'root', // 账号
+  password : '123456', // 密码
+  database : 'test01'  // 数据库名
+});
+ 
+// 打开连接
+connection.connect();
+ 
+// 执行sql语句
+connection.query('select * from user', function (error, results, fields) {
+  // error 错误对象，如果没有报错就返回null
+  // console.log(error);
+  // results 执行sql语句得到一个结果集 有错误就是 undefined
+  // console.log(results);
+  // console.log(results[4].username); // coderdxh
+
+  // fields 拿到的是字段的信息，不常用
+  // console.log(fields);
+});
+ 
+// 关闭连接
+connection.end();
+```
+
+### nodejs操作数据库---增
+
+```js
+const mysql  = require('mysql');
+
+// 创建一个和数据库的连接
+const connection = mysql.createConnection({
+  host : 'localhost', // 数据库服务器的地址
+  user : 'root', // 账号
+  password : '123456', // 密码
+  database : 'test01'  // 数据库名
+});
+ 
+// 打开连接
+connection.connect();
+
+// 前端传递过来的数据
+let username = "coderdxh";
+let password = 888888;
+ 
+// 执行sql语句
+connection.query(`insert into user(username,password) values('${username}', ${password})`, (error, results) => {
+  if (error == null) {
+    console.log(results); // 返回的结果是一个对象
+    console.log(results.affectedRows); // 如果受影响的行数大于零，说明新增成功了
+    console.log(results.insertId); // 插入这条数据的Id
+  }
+});
+ 
+// 关闭连接
+connection.end();
+```
+
+### nodejs操作数据库---改
+
+```js
+const mysql  = require('mysql');
+
+// 创建一个和数据库的连接
+const connection = mysql.createConnection({
+  host : 'localhost', // 数据库服务器的地址
+  user : 'root', // 账号
+  password : '123456', // 密码
+  database : 'test01'  // 数据库名
+});
+ 
+// 打开连接
+connection.connect();
+
+// 前端传递过来的数据
+let id = 8;
+let username = "dxhcoder";
+let password = 666666;
+ 
+// 执行sql语句
+connection.query(`update user set username = '${username}', password = ${password} where id = ${id}`, (error, results) => {
+  if (error == null) {
+    console.log(results); // 返回的结果是一个对象
+    console.log(results.affectedRows); // 如果受影响的行数
+    console.log(results.changedRows); // 改变的行数
+  }
+});
+ 
+// 关闭连接
+connection.end();
+```
+
+### nodejs 操作数据库---删
+
+```js
+const mysql  = require('mysql');
+
+// 创建一个和数据库的连接
+const connection = mysql.createConnection({
+  host : 'localhost', // 数据库服务器的地址
+  user : 'root', // 账号
+  password : '123456', // 密码
+  database : 'test01'  // 数据库名
+});
+ 
+// 打开连接
+connection.connect();
+
+// 前端传递过来的数据
+let id = 7; // 要删除的id
+ 
+// 执行sql语句
+connection.query(`delete from user where id = ${id}`, (error, results) => {
+  if (error == null) {
+    console.log(results); // 返回的结果是一个对象
+    console.log(results.affectedRows); // 如果受影响的行数
+  }
+});
+ 
+// 关闭连接
+connection.end();
+```
+
