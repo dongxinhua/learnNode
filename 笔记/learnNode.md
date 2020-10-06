@@ -780,7 +780,7 @@ app.post("/addFood", (req, res) => {
     body: JSON.stringify(postData)
   }, (error, response, body) => {
     if (!error && response.statusCode == 200) {
-      // 不报错冰球状态码为200时，说明请求到结果了，将数据返回给前端即可。
+      // 不报错并且状态码为200时，说明请求到结果了，将数据返回给前端即可。
       res.send(JSON.stringify(body));
     }
   })
