@@ -447,8 +447,11 @@ const bodyParser = require("body-parser");
 
 const app = express();
 
-// parse application/x-www-form-urlencoded  使用body-parser中间件
+// parse application/x-www-form-urlencoded
 app.use(bodyParser.urlencoded({ extended: false }))
+ 
+// parse application/json
+app.use(bodyParser.json())
 
 app.post("/login", (request, response) => {
   // 接收用户传递过来的用户名和密码
@@ -669,6 +672,120 @@ app.get("/all", (req, res) => {
 
 app.listen(8080, () => {
   console.log("success...");
+});
+```
+
+#### 6.node服务器代理
+
+​        有些情况，我们以上两种都不能解决我们的跨域问题，比如后端程序员不配合，或者说后端程序员设置跨域了，但是设置的允许跨域的是对应网站的协议域名端口号，而我们日常开发时还是通过本地服务器发送的网络请求(比如live-server开启的是127.0.0.1:5500),同样存在跨域问题，那我们应该怎么做呢？这时，就用到了node服务器代理。
+
+​		首先，我们要理解的是，ajax请求是不是存在同源策略的限制，所以我们有跨域的问题。但是呢，我们可以通过node服务器往其他服务器发送网络请求，这是不遵循同源策略的，因此不会产生跨域问题。我们通过express搭建node服务器很简单:
+
+```js
+const express = require("express");
+
+const app = new express();
+
+app.get("/getNews",(req, res) => {
+    // 先不写具体内容，只是express搭建node服务器
+    res.send();
+});
+
+app.listen(8080, () => {
+    console.log("8080端口开启了...");
+})
+```
+
+​		然后，node服务器怎么发送网络请求呢？这时，我们要看我们请求的url地址是 http 协议还是 https 协议，如果是 http 协议那么我们就用 http 模块，如果是 https 协议，那我们就要用 https 模块。假设我们请求的url地址是 https 协议，我们用到的就是 https 模块。
+
+​		那么，我们用 https 模块如何发送网络请求呢? 如果是get请求的话，我们使用 https.get()。node的 https 模块发起请求之后，由于此时node服务器充当一个接收数据的角色，而数据接收时是通过一小块(chunk)传过来的，因此我们要绑定**data事件**(这个事件会执行多次，在这个事件中我们就把这些小块儿数据拼接起来),还有一个 **end 事件** (这个事件只执行一次，表示数据已经传递完了)，然后把处理后的数据返回给前端。
+
+​		前端请求 node 服务器，是不是也有跨域问题？所以我们要设置 **CORS** 响应头。这样前端访问 node 服务器也没有跨域问题了，而 node 服务器访问 对应服务器也没有跨域问题；然后对应服务器把数据返回给 node 服务器，node 服务器再把数据返回给前端。这样就解决了跨域问题，这种方式就叫做 **node 服务器代理解决跨域问题**。
+
+```js
+const express = require("express");
+const https = require("https");
+
+const app = new express();
+
+// 这里也可以使用 cors 插件
+app.use((req, res, next) => {
+  // 设置响应头 解决跨域的问题
+  res.setHeader("Access-Control-Allow-Origin", "http://127.0.0.1:5500");
+  next();
+});
+
+app.get("/getNews",(req, res) => {
+    const {channel, appKey} = req.query;
+  	const netUrl = `https://api.jisuapi.com/news/get?channel=${channel}&start=0&num=10&appkey=${appKey}`;
+    https.get(netUrl, function(responseObj) {
+        // node的https模块发起请求之后， 回调函数里的参数不是获取到的数据， 是一个响应对象， 数据存储在该对象内部， 我们通过对该对象进行监听才能拿到数据
+        let allData = "";
+        responseObj.on("data", function(chunk) {
+            allData += chunk;
+        });
+        responseObj.on("end", function() {
+            const data = JSON.parse(allData);
+            res.send(JSON.stringify(data));
+        })
+    });
+});
+
+app.listen(8080, () => {
+    console.log("8080端口开启了...");
+})
+```
+
+那如果是post请求呢？虽然node官网给我们了http/https.request这个api，但是用起来不方便，所以我们可以使用**request**模块， **npm i request** ,通过这个模块就可以发送post请求。
+
+```js
+const express = require("express");
+const bodyParser = require("body-parser"); 
+const request = require("request");
+
+const app = new express();
+
+app.use((req,res,next) => {
+  res.setHeader("Access-Control-Allow-Origin", "http://127.0.0.1:5500");
+  next();
+})
+
+// parse application/x-www-form-urlencoded
+app.use(bodyParser.urlencoded({ extended: false }))
+ 
+// parse application/json
+app.use(bodyParser.json())
+
+app.post("/addFood", (req, res) => {
+  // 接收前端传来的数据
+  const { name, description, restaurant_id } = req.body;
+
+  // 将数据保存在一个对象中
+  const postData = {
+    'name': name,
+    "description": description,
+    "restaurant_id": Number(restaurant_id)    
+  };
+
+  // 发送网络请求
+  request({
+    url: "https://elm.cangdu.org/shopping/addcategory",
+    method: "POST",
+    json: true,
+    headers: {
+      "content-type": "application/json"
+    },
+    body: JSON.stringify(postData)
+  }, (error, response, body) => {
+    if (!error && response.statusCode == 200) {
+      // 不报错冰球状态码为200时，说明请求到结果了，将数据返回给前端即可。
+      res.send(JSON.stringify(body));
+    }
+  })
+});
+
+app.listen(8080, () => {
+  console.log("8080端口已开启...")
 });
 ```
 
