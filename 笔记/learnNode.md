@@ -1283,3 +1283,257 @@ mongoose.connection.on('open', (err) => {
 })
 ```
 
+## 饿了么项目的购物车后端代码
+
+```js
+const express = require("express");
+const mongoose = require("mongoose");
+const bodyParser = require('body-parser');
+const cors = require("cors");
+
+const app = express();
+
+// // parse application/x-www-form-urlencoded  使用body-parser中间件
+app.use(bodyParser.urlencoded({ extended: false }))
+app.use(bodyParser.json())
+// app.use(express.static("./"));
+
+// app.use((req, res, next) => {
+//   // 在这里设置响应头，允许资源共享
+//   res.setHeader("Access-Control-Allow-Origin", "*");
+//   next();
+// });
+
+app.use(cors());
+
+app.listen(4399, function () {
+  console.log("服务器开启监听4399端口...");
+  mongoose.connect('mongodb://localhost/coderdxh', {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+  });
+});
+
+mongoose.connection.on("open", function () {
+  console.log("数据库链接成功!");
+  /*
+      创建一个数据结构
+      1. 用户ID  Number
+      2. shopID  Number
+      3. foods  Array
+      4. 商品介绍  string
+    */
+  const foodItem = new mongoose.Schema({
+    titleId: {
+      type: Number
+    },
+    foodItemId: {
+      type: Number
+    },
+    foodId: {
+      type: Number
+    },
+    skuId: {
+      type: Number
+    },
+    foodName: {
+      type: String
+    },
+    packing_fee: {
+      type: Number
+    },
+    price: {
+      type: Number
+    },
+    num: {
+      type: Number
+    },
+    specs_name: {
+      type: String
+    }
+  });
+
+  const food = new mongoose.Schema({
+    userId: {
+      type: Number
+    },
+    shopId: {
+      type: Number
+    },
+    foods: [foodItem]
+  }, { collection: "shopCar", versionKey: false });
+
+  const order = new mongoose.Schema({
+    userId: {
+      type: Number
+    },
+    shopId: {
+      type: Number
+    },
+    date: {
+      type: Number
+    },
+    shopName: {
+      type: String
+    },
+    shopImg: {
+      type: String
+    },
+    float_delivery_fee: {
+      type: Number
+    },
+    address: {
+      type: Object
+    },
+    foods: [foodItem]
+  }, { collection: "ordersCar", versionKey: false });
+
+  const myModel = mongoose.model("shopCar", food);
+  const myModel2 = mongoose.model("ordersCar", order);
+
+  app.get("/allFoods", function (req, res) {
+    // 向数据库请求所有数据并返回
+    myModel.find(function (error, result) {
+      if (!error) {
+        res.json({
+          message: "查询成功",
+          data: result
+        });
+      } else {
+        res.json({
+          message: "查询失败",
+          data: error
+        });
+      }
+    });
+  });
+
+  app.get("/myFoods", function (req, res) {
+    const { userId, shopId } = req.query;
+    // 向数据库请求所有数据并返回
+    myModel.find({userId: userId, shopId: shopId},function (error, result) {
+      console.log(result)
+      if (!error) {
+        res.json({
+          code: 1,
+          message: "查询成功---购物车",
+          foods: result.length > 0 ? result[0].foods : []
+        });
+      } else {
+        res.json({
+          code: 0,
+          message: "查询失败---购物车",
+          data: error
+        });
+      }
+    });
+  });
+
+  // 查询订单
+  app.get("/myOrders", function (req, res) {
+    const { userId } = req.query;
+    // 向数据库请求所有数据并返回
+    myModel2.find({userId: userId },function (error, result) {
+      // console.log(result)
+      if (!error) {
+        res.json({
+          code: 1,
+          message: "查询成功---订单",
+          foods: result.length > 0 ? result : []
+        });
+      } else {
+        res.json({
+          code: 0,
+          message: "查询失败---订单",
+          data: error
+        });
+      }
+    });
+  });
+
+  // 添加订单
+  app.post("/addOrder", (req, res) => {
+    const { userId, shopId, date, foods, shopName, shopImg, float_delivery_fee, address } = req.body;
+    myModel2.create({
+      userId: userId,
+      shopId: shopId,
+      date: date,
+      shopName: shopName,
+      shopImg: shopImg,
+      float_delivery_fee: float_delivery_fee,
+      address: address,
+      foods: foods
+    }, function (error, result) {
+      if (!error) {
+        res.json({
+          message: "添加成功",
+          data: result.data
+        });
+      } else {
+        res.json({
+          message: "添加失败",
+          data: error
+        });
+      }
+    })
+  });
+
+  app.post("/addFood", function (req, res) {
+    // console.log(req.body)
+    const { userId, shopId, foods } = req.body;
+    // console.log(userId, shopId, foods)
+    myModel.find({ userId: userId, shopId: shopId }, function (error, result) {
+      if (!error) {
+        // 没有错误，说明能够查找到，能查找到就进行操作
+        if (result.length != 0) {
+          // 长度不为0，说明有数据，为修改操作
+          myModel.updateOne({ userId: userId, shopId: shopId }, { $set: { foods: foods } }, (error, result) => {
+            if (error) {
+              res.json({ status: 0, msg: "修改失败", foods });
+            } else {
+              res.json({ status: 1, msg: "修改成功", foods }); // 把要修改的值再传递回去
+            }
+          });
+        } else {
+          // 长度为0，说明没有结果，那么应该是添加操作
+          myModel.create({
+            userId: userId,
+            shopId: shopId,
+            foods: foods
+          }, function (error, result) {
+            if (!error) {
+              res.json({
+                message: "添加成功",
+                data: result
+              });
+            } else {
+              res.json({
+                message: "添加失败",
+                data: error
+              });
+            }
+          })
+        }
+      } else {
+        // 有错误，说明查找不到
+        res.json({
+          message: "查询失败，id有误",
+          data: error
+        });
+      }
+    });
+  });
+
+  app.post("/delFood", (req, res) => {
+    const { userId, shopId } = req.body;
+    myModel.deleteOne({ userId: userId, shopId: shopId }, (error, result) => {
+      if (error) {
+        res.json({ status: 0, msg: "删除失败" });
+      } else {
+        res.json({ status: 1, msg: "删除成功" });
+      }
+    });
+  });
+});
+```
+
